@@ -182,6 +182,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  t->blocked_time = 0;  //initial unblocked
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);

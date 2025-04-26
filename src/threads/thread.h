@@ -100,6 +100,7 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /**< Detects stack overflow. */
+    int64_t blocked_time;  //check the time the thread has been blocked
   };
 
 /** If false (default), use round-robin scheduler.
