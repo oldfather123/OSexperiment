@@ -100,7 +100,7 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /**< Detects stack overflow. */
-    int64_t blocked_time;  //check the time the thread has been blocked
+    int64_t ticks_blocked;
   };
 
 /** If false (default), use round-robin scheduler.
@@ -126,6 +126,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_wake (struct thread *, void *);
 
 /** Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);

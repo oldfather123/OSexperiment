@@ -182,7 +182,8 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-  t->blocked_time = 0;  //initial unblocked
+
+  t->ticks_blocked = 0;
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -313,6 +314,16 @@ thread_yield (void)
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
+}
+
+void
+thread_wake(struct thread *t, void *aux UNUSED)
+{
+  if(t->status == THREAD_BLOCKED && t->ticks_blocked > 0){
+    t->ticks_blocked--;
+    if(t->ticks_blocked == 0)
+      thread_unblock(t);
+  }
 }
 
 /** Invoke function 'func' on all threads, passing along 'aux'.
