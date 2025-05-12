@@ -98,6 +98,8 @@ thread_init (void)
   list_init (&sleep_list);
   list_init (&all_list);
 
+  load_avg = FP_CONST (0);
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -114,7 +116,6 @@ thread_start (void)
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
-  load_avg = FP_CONST (0);
 
   /* Start preemptive thread scheduling. */
   intr_enable ();
@@ -141,6 +142,11 @@ thread_tick (void)
     kernel_ticks++;
   if(++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  if(thread_mlfqs){
+    t->recent_cpu = FP_ADD_MIX(t->recent_cpu, 1);
+    if(thread_ticks % TIME_SLICE == 0)
+      thread_update_priority(thread_current());
+  }
   struct list_elem *e = list_begin (&sleep_list);
   struct list_elem *temp;
   while (e != list_end (&sleep_list)){
@@ -375,7 +381,7 @@ thread_get_priority (void)
 
 /** Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
   thread_current()->nice = nice;
   thread_update_priority (thread_current());
@@ -417,20 +423,24 @@ thread_increase_curr_recent_cpu (void)
 void
 thread_update_priority(struct thread *t)
 {
-  if (t == idle_thread)
+  /*if (t == idle_thread)
     return;
   ASSERT(thread_mlfqs);
-  ASSERT(t != idle_thread);
-  t->priority = FP_INT_PART (FP_SUB_MIX (FP_SUB (FP_CONST (PRI_MAX), FP_DIV_MIX (t->recent_cpu, 4)), 2 * t->nice));
-  t->priority = t->priority < PRI_MIN ? PRI_MIN : t->priority;
-  t->priority = t->priority > PRI_MAX ? PRI_MAX : t->priority;
+  ASSERT(t != idle_thread);*/
+  int new_priority = (int) FP_ROUND (FP_SUB (FP_CONST ((PRI_MAX - ((t->nice) * 2))), FP_DIV_MIX (t->recent_cpu, 4)));
+  if(new_priority < PRI_MIN)
+    new_priority = PRI_MIN;
+  else if(new_priority > PRI_MAX)
+    new_priority = PRI_MAX;
+  t->priority = new_priority;
 }
 
 void
 thread_update_load_avg_and_recent_cpu (void)
 {
-  ASSERT (thread_mlfqs);
-  ASSERT (intr_context());
+  /*ASSERT (thread_mlfqs);
+  ASSERT (intr_context());*/
+  enum intr_level old_level = intr_disable();
   size_t ready_threads = list_size(&ready_list);
   if(thread_current() != idle_thread)
     ready_threads++;
@@ -444,6 +454,7 @@ thread_update_load_avg_and_recent_cpu (void)
       thread_update_priority (t);
     }
   }
+  intr_set_level(old_level);
 }
 
 
