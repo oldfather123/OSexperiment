@@ -233,6 +233,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  thread_yield();
 
   return tid;
 }
@@ -270,7 +271,6 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  //list_push_back (&ready_list, &t->elem);
   list_insert_ordered (&ready_list, &t->elem, compare_threads_by_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -415,7 +415,7 @@ thread_get_recent_cpu (void)
 bool
 compare_threads_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
-  return list_entry (a, struct thread, elem)->priority <= list_entry (b, struct thread, elem)->priority;
+  return list_entry (a, struct thread, elem)->priority > list_entry (b, struct thread, elem)->priority;
 }
 
 void
@@ -444,15 +444,6 @@ thread_update_load_avg_and_recent_cpu (void)
   if(thread_current() != idle_thread)
     ready_threads++;
   load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX (FP_CONST (ready_threads), 60));
-  /*struct thread *t;
-  struct list_elem *e;
-  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
-    t = list_entry (e, struct thread, allelem);
-    if (t != idle_thread){
-      t->recent_cpu = FP_ADD_MIX (FP_MULT (FP_DIV (FP_MULT_MIX (load_avg, 2), FP_ADD_MIX (FP_MULT_MIX (load_avg, 2), 1)), t->recent_cpu), t->nice);
-      thread_update_priority (t);
-    }
-  }*/
   thread_foreach(thread_update_recent_cpu, NULL);
   intr_set_level(old_level);
 }
@@ -546,8 +537,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   t->ticks_blocked = 0;
-  /*t->nice = 0;
-  t->recent_cpu = FP_CONST (0);*/
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
