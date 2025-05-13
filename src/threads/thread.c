@@ -409,24 +409,10 @@ thread_get_recent_cpu (void)
   return FP_ROUND(FP_MULT_MIX(thread_current()->recent_cpu, 100));
 }
 
-void
-thread_increase_curr_recent_cpu (void)
-{
-  ASSERT (thread_mlfqs);
-  ASSERT (intr_context());
-  struct thread *curr = thread_current();
-  if (curr == idle_thread)
-    return;
-  curr->recent_cpu = FP_ADD_MIX(curr->recent_cpu, 1);
-}
 
 void
 thread_update_priority(struct thread *t)
 {
-  /*if (t == idle_thread)
-    return;
-  ASSERT(thread_mlfqs);
-  ASSERT(t != idle_thread);*/
   int new_priority = (int) FP_ROUND (FP_SUB (FP_CONST ((PRI_MAX - ((t->nice) * 2))), FP_DIV_MIX (t->recent_cpu, 4)));
   if(new_priority < PRI_MIN)
     new_priority = PRI_MIN;
@@ -436,16 +422,21 @@ thread_update_priority(struct thread *t)
 }
 
 void
+thread_update_recent_cpu(struct thread *t, void *aux UNUSED)
+{ 
+  t->recent_cpu = FP_ADD_MIX (FP_DIV (FP_MULT (FP_MULT_MIX (load_avg, 2), t->recent_cpu),FP_ADD_MIX (FP_MULT_MIX (load_avg, 2), 1)), t->nice);
+  thread_update_priority (t);
+}
+
+void
 thread_update_load_avg_and_recent_cpu (void)
 {
-  /*ASSERT (thread_mlfqs);
-  ASSERT (intr_context());*/
   enum intr_level old_level = intr_disable();
-  size_t ready_threads = list_size(&ready_list);
+  int ready_threads = list_size(&ready_list);
   if(thread_current() != idle_thread)
     ready_threads++;
   load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX (FP_CONST (ready_threads), 60));
-  struct thread *t;
+  /*struct thread *t;
   struct list_elem *e;
   for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
     t = list_entry (e, struct thread, allelem);
@@ -453,7 +444,8 @@ thread_update_load_avg_and_recent_cpu (void)
       t->recent_cpu = FP_ADD_MIX (FP_MULT (FP_DIV (FP_MULT_MIX (load_avg, 2), FP_ADD_MIX (FP_MULT_MIX (load_avg, 2), 1)), t->recent_cpu), t->nice);
       thread_update_priority (t);
     }
-  }
+  }*/
+  thread_foreach(thread_update_recent_cpu, NULL);
   intr_set_level(old_level);
 }
 
@@ -546,8 +538,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   t->ticks_blocked = 0;
-  t->nice = 0;
-  t->recent_cpu = FP_CONST (0);
+  /*t->nice = 0;
+  t->recent_cpu = FP_CONST (0);*/
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
