@@ -39,7 +39,10 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  //tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  char *save;
+  char *cmd = strtok_r(file_name, " ", &save);
+  tid = thread_create(cmd, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -59,13 +62,15 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  //success = load (file_name, &if_.eip, &if_.esp);
+  char *save;
+  char *cmd = strtok_r(file_name, " ", &save);
+  success = load(cmd, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
-
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -103,6 +108,7 @@ process_exit (void)
   pd = cur->pagedir;
   if (pd != NULL) 
     {
+      printf ("%s: exit(%d)\n", cur->name, cur->process->exit_code);
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
@@ -462,4 +468,18 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+struct process_control_block *process_create(struct thread *t)
+{
+    /* Allocate process. */
+    struct process_control_block *p = palloc_get_page(PAL_ZERO);
+    if (p == NULL)
+        return NULL;
+
+    p->thread = t;
+    p->pid = t->tid;
+    p->exit_code = -1;
+
+    return p;
 }
